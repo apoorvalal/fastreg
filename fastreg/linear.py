@@ -10,18 +10,39 @@ import numpy as np
 import scipy.sparse as sp
 
 from .tools import (
-    hstack, multiply, ensure_dense, group_sums, group_means, chainer,
-    block_inverse, valid_rows, all_valid
+    hstack,
+    multiply,
+    ensure_dense,
+    group_sums,
+    group_means,
+    chainer,
+    block_inverse,
+    valid_rows,
+    all_valid,
 )
 from .formula import (
-    category_indices, design_matrices, parse_tuple, parse_list, ensure_formula,
-    Categ
+    category_indices,
+    design_matrices,
+    parse_tuple,
+    parse_list,
+    ensure_formula,
+    Categ,
 )
 from .summary import param_table
 
+
 def ols(
-    y=None, x=None, formula=None, data=None, absorb=None, cluster=None, hdfe=None,
-    stderr=True, extern=None, warn=True, output='table'
+    y=None,
+    x=None,
+    formula=None,
+    data=None,
+    absorb=None,
+    cluster=None,
+    hdfe=None,
+    stderr=True,
+    extern=None,
+    warn=True,
+    output="table",
 ):
     # convert to formula system
     y, x = ensure_formula(x=x, y=y, formula=formula)
@@ -33,7 +54,7 @@ def ols(
     if hdfe is not None:
         h_trm = parse_tuple(hdfe, convert=Categ)
         h_nam = h_trm.name()
-        x = (x - h_trm) + h_trm # pop to end
+        x = (x - h_trm) + h_trm  # pop to end
 
     # don't include absorb
     if absorb is not None:
@@ -56,8 +77,15 @@ def ols(
 
     # make design matrices
     y_name, y_vec, (x0_names, c_names0), (x0_mat, c_mat), valid = design_matrices(
-        y=y, x=x, formula=formula, data=data, valid0=valid, extern=extern, warn=warn,
-        flatten=False, validate=True
+        y=y,
+        x=x,
+        formula=formula,
+        data=data,
+        valid0=valid,
+        extern=extern,
+        warn=warn,
+        flatten=False,
+        validate=True,
     )
 
     # drop final invalid from cluster and absorb
@@ -96,7 +124,7 @@ def ols(
     beta = solve(xpx, xpy)
 
     # just the point estimates
-    if output == 'point':
+    if output == "point":
         return beta
 
     # find residuals
@@ -105,15 +133,15 @@ def ols(
 
     # just the point estimate
     if stderr is False:
-        if output == 'table':
+        if output == "table":
             return param_table(beta, y_name, x_names)
-        elif output == 'dict':
+        elif output == "dict":
             return {
-                'beta': beta,
-                'y_name': y_name,
-                'x_names': x_names,
-                'y_hat': y_hat,
-                'e_hat': e_hat,
+                "beta": beta,
+                "y_name": y_name,
+                "x_names": x_names,
+                "y_hat": y_hat,
+                "e_hat": e_hat,
             }
 
     # find inv(xpx) somehow
@@ -126,7 +154,7 @@ def ols(
 
     # compute classical sigma hat
     if stderr is True or hdfe is not None:
-        s2 = (e_hat @ e_hat)/(N-K)
+        s2 = (e_hat @ e_hat) / (N - K)
 
     # compute Xe moment
     if cluster is not None or type(stderr) is str:
@@ -137,32 +165,34 @@ def ols(
         xe2 = error_sums(xe_mat, s_mat)
         sigma = ixpx @ xe2 @ ixpx
     elif hdfe is not None:
-        sigma = s2*ixr, s2*ixc
+        sigma = s2 * ixr, s2 * ixc
     elif stderr is True:
-        sigma = s2*ixpx
+        sigma = s2 * ixpx
     elif type(stderr) is str:
-        hcret = re.match(r'hc([0-3])', stderr.lower())
+        hcret = re.match(r"hc([0-3])", stderr.lower())
         if hcret is None:
-            raise Exception(f'Unrecognized covariance type {stderr}')
-        hc, = map(int, hcret.groups())
+            raise Exception(f"Unrecognized covariance type {stderr}")
+        (hc,) = map(int, hcret.groups())
         sigma = hcn_stderr(hc, x_mat, xe_mat, ixpx)
 
     # return requested
-    if output == 'table':
+    if output == "table":
         return param_table(beta, y_name, x_names, sigma=sigma)
-    elif output == 'dict':
+    elif output == "dict":
         return {
-            'beta': beta,
-            'sigma': sigma,
-            'y_name': y_name,
-            'x_names': x_names,
-            'y_hat': y_hat,
-            'e_hat': e_hat,
+            "beta": beta,
+            "sigma": sigma,
+            "y_name": y_name,
+            "x_names": x_names,
+            "y_hat": y_hat,
+            "e_hat": e_hat,
         }
+
 
 ##
 ## standard errors
 ##
+
 
 # inv(X.T @ X) when X = [X D] and D is sparse and diagonal
 def block_outer_inverse(X, D):
@@ -172,12 +202,14 @@ def block_outer_inverse(X, D):
     d = D.power(2).sum(axis=0).getA1()
     return block_inverse(A, B, C, d)
 
+
 # from cameron and miller
 def error_sums(xe, c):
     codes, _ = category_indices(c, dropna=True)
     xeg = group_sums(xe, codes)
     xe2 = xeg.T @ xeg
     return xe2
+
 
 # handles hc in (0, 1, 2, 3)
 def hcn_stderr(hc, x, xe, ixpx):
@@ -187,18 +219,20 @@ def hcn_stderr(hc, x, xe, ixpx):
     else:
         xq = x @ np.linalg.cholesky(ixpx)
         hii = np.sum(xq**2, axis=1)
-        hinv = 1/(1-hii)
+        hinv = 1 / (1 - hii)
         if hc == 2:
             hinv = np.sqrt(hinv)
         xeh = multiply(xe, hinv[:, None])
     sigma = ixpx @ (xeh.T @ xeh) @ ixpx
     if hc == 1:
-        sigma *= N/(N-K)
+        sigma *= N / (N - K)
     return sigma
+
 
 ##
 ## absorption
 ##
+
 
 # will absorb null (-1) values together
 def absorb_categorical(y, x, abs):

@@ -13,13 +13,16 @@ import scipy.sparse as sp
 from pandas._libs.hashtable import SIZE_HINT_LIMIT
 from pandas.core.sorting import get_group_index
 
+
 # general pointwise multiply
 def multiply(a, b):
-    return a.multiply(b) if sp.issparse(a) else a*b
+    return a.multiply(b) if sp.issparse(a) else a * b
+
 
 # make a sparse matrix dense
 def ensure_dense(x):
     return x.toarray() if sp.issparse(x) else x
+
 
 # make a row vector into a matrix, maybe
 def atleast_2d(x, axis=0):
@@ -31,6 +34,7 @@ def atleast_2d(x, axis=0):
     else:
         return x
 
+
 # return vector or matrix diagonal
 def maybe_diag(x):
     if x.ndim == 1:
@@ -38,8 +42,9 @@ def maybe_diag(x):
     else:
         return x.diagonal()
 
+
 # allows None's and handles empty data
-def vstack(v, format='csr'):
+def vstack(v, format="csr"):
     v = [x for x in v if x is not None]
     if len(v) == 0:
         return None
@@ -50,8 +55,9 @@ def vstack(v, format='csr'):
     else:
         return np.vstack(v)
 
+
 # allows None's and handles empty data
-def hstack(v, format='csr'):
+def hstack(v, format="csr"):
     v = [x for x in v if x is not None]
     if len(v) == 0:
         return None
@@ -62,22 +68,12 @@ def hstack(v, format='csr'):
     else:
         return np.hstack(v)
 
-# allows None's and handles empty data
-def vstack(v, format='csr'):
-    v = [x for x in v if x is not None]
-    if len(v) == 0:
-        return None
-    elif len(v) == 1:
-        return v[0]
-    elif any([sp.issparse(x) for x in v]):
-        return sp.vstack(v, format=format)
-    else:
-        return np.vstack(v)
 
 def get_dtype(*v):
-    tarr = [x.dtype for x in v if hasattr(x, 'dtype')]
-    tsca = [type(x) for x in v if not hasattr(x, 'dtype')]
+    tarr = [x.dtype for x in v if hasattr(x, "dtype")]
+    tsca = [type(x) for x in v if not hasattr(x, "dtype")]
     return np.lib.index_tricks.find_common_type(tarr, tsca)
+
 
 # splice two 1d arrays based on boolean condition
 def splice(cond, x1, x2):
@@ -87,14 +83,17 @@ def splice(cond, x1, x2):
     x[~cond] = x2
     return x
 
+
 # concat lists
 def chainer(v):
     return list(chain.from_iterable(v))
+
 
 # factorize like pd.factorize but with 2d arrays
 def factorize_2d(a):
     # column compressor
     size_hint = min(a.shape[0], SIZE_HINT_LIMIT)
+
     def f(vals):
         codes, labels = pd.factorize(vals, sort=True, size_hint=size_hint)
         return codes.astype("i8", copy=False), labels, len(labels)
@@ -111,6 +110,7 @@ def factorize_2d(a):
 
     return gcode, ulabs
 
+
 # split list on boolean condition
 def categorize(func, seq):
     true, false = [], []
@@ -121,45 +121,49 @@ def categorize(func, seq):
             false.append(item)
     return true, false
 
+
 # handles sparse too (dense based on statsmodels version)
 def group_sums(x, codes):
     if sp.issparse(x):
         _, K = x.shape
         x = x.tocsc()
         C = max(codes) + 1
-        idx = [(x.indptr[i], x.indptr[i+1]) for i in range(K)]
-        return np.vstack([
-            np.bincount(
-                codes[x.indices[i:j]], weights=x.data[i:j], minlength=C
-            ) for i, j in idx
-        ]).T
+        idx = [(x.indptr[i], x.indptr[i + 1]) for i in range(K)]
+        return np.vstack(
+            [
+                np.bincount(codes[x.indices[i:j]], weights=x.data[i:j], minlength=C)
+                for i, j in idx
+            ]
+        ).T
     elif np.ndim(x) == 1:
         return np.bincount(codes, weights=x)
     else:
         _, K = x.shape
-        return np.vstack([
-            np.bincount(codes, weights=x[:, j]) for j in range(K)
-        ]).T
+        return np.vstack([np.bincount(codes, weights=x[:, j]) for j in range(K)]).T
+
 
 # sparsity handled by group_sums
 def group_means(x, codes):
     if np.ndim(x) == 1:
-        return group_sums(x, codes)/np.bincount(codes)
+        return group_sums(x, codes) / np.bincount(codes)
     else:
-        return group_sums(x, codes)/np.bincount(codes)[:, None]
+        return group_sums(x, codes) / np.bincount(codes)[:, None]
+
 
 # block inversion with diagonal d
 def block_inverse(A, B, C, d, inv=la.inv):
-    d1 = 1/d
+    d1 = 1 / d
     d1l, d1r = d1[:, None], d1[None, :]
-    A1 = inv(A - (B*d1r) @ C)
+    A1 = inv(A - (B * d1r) @ C)
     Ai = A1
-    di = d1 + np.sum((d1l*C)*(A1 @ (B*d1r)).T, axis=1)
+    di = d1 + np.sum((d1l * C) * (A1 @ (B * d1r)).T, axis=1)
     return Ai, di
+
 
 # do isnan on general ndarrays
 def fillna(x, v=0):
     return np.where(np.isnan(x), v, x)
+
 
 # try to handle dense and various sparse formats
 def valid_rows(x):
@@ -167,14 +171,15 @@ def valid_rows(x):
     if fmt is None:
         null = ~pd.isnull(x)
         return null if x.ndim == 1 else null.all(axis=1)
-    elif fmt == 'csr':
+    elif fmt == "csr":
         N, _ = x.shape
-        nidx, = np.nonzero(np.isnan(x.data))
-        rows = np.unique(np.digitize(nidx, x.indptr)-1)
+        (nidx,) = np.nonzero(np.isnan(x.data))
+        rows = np.unique(np.digitize(nidx, x.indptr) - 1)
         null = np.isin(np.arange(N), rows)
     else:
         print(f'valid_rows: unsupported format "{fmt}"')
     return ~null
+
 
 # aggregate valid masks
 def all_valid(*mats):
@@ -183,14 +188,17 @@ def all_valid(*mats):
         return None
     return reduce(and_, mats)
 
+
 # list based cumsum
 def cumsum(x):
     return list(accumulate(x))
+
 
 # split by sizes rather than boundaries
 def split_size(x, s):
     b = cumsum(s)
     return np.split(x, b)
+
 
 # expects compact positive integers, except for -1 being null
 # drops -1 always and 0 if drop (maps into all zeros)
@@ -199,45 +207,53 @@ def onehot_encode(indx, drop=True):
     rows, cols = np.flatnonzero(sel), indx[sel]
     data = np.ones_like(rows)
     N, K = len(indx), cols.max() + 1
-    smat = sp.csr_matrix(
-        (data, (rows, cols)), shape=(N, K)
-    )
+    smat = sp.csr_matrix((data, (rows, cols)), shape=(N, K))
     return smat
+
 
 ##
 ## function tools
 ##
 
+
 # decorator with optional flags
 def decorator(decor0):
     def decor1(func=None, *args, **kwargs):
         if func is None:
+
             def decor2(func1):
                 return decor0(func1, *args, **kwargs)
+
             return decor2
         else:
             return decor0(func, *args, **kwargs)
+
     return decor1
 
-def func_name(func, anon='f'):
+
+def func_name(func, anon="f"):
     fname = func.__name__
-    if anon is not None and fname == '<lambda>':
+    if anon is not None and fname == "<lambda>":
         fname = anon
     return fname
 
+
 def func_args(name, *args, **kwargs):
-    astr = ','.join([f'{a}' for a in args])
-    kstr = ','.join([f'{k}={v}' for k, v in kwargs.items()])
-    sig = '|'.join(filter(len, [astr, kstr]))
-    return f'{name}({sig})'
+    astr = ",".join([f"{a}" for a in args])
+    kstr = ",".join([f"{k}={v}" for k, v in kwargs.items()])
+    sig = "|".join(filter(len, [astr, kstr]))
+    return f"{name}({sig})"
+
 
 def func_disp(func, name=None):
     name = func_name(func) if name is None else name
     return partial(func_args, name)
 
+
 ##
 ## semi-defunct tools
 ##
+
 
 def category_indices_numeric(vals, return_labels=False):
     # get unique indices
@@ -249,7 +265,7 @@ def category_indices_numeric(vals, return_labels=False):
         labs1 = np.delete(labs, nan_loc, axis=0)
         indx1 = np.where(np.isin(indx, nan_loc), -1, indx)
         _, indx2 = np.unique(indx1, return_inverse=True)
-        indx, labs = indx2-1, labs1
+        indx, labs = indx2 - 1, labs1
 
     if return_labels:
         return indx, list(map(tuple, labs))
